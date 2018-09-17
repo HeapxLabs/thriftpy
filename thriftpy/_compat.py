@@ -18,9 +18,8 @@ PYPY = "__pypy__" in sys.modules
 UNIX = platform.system() in ("Linux", "Darwin")
 CYTHON = UNIX and not PYPY  # Cython always disabled in pypy and windows
 
-# only python2.7.9 and python 3.4 or above have true ssl context
-MODERN_SSL = (2, 7, 9) <= sys.version_info < (3, 0, 0) or \
-    sys.version_info >= (3, 4)
+# only Python 2.7.9 and Python 3.4 or above have true ssl context
+MODERN_SSL = sys.version_info >= (2, 7, 9)
 
 if PY3:
     text_type = str
@@ -33,8 +32,8 @@ if PY3:
 else:
     text_type = unicode  # noqa
     string_types = (str, unicode)  # noqa
-    from urllib2 import urlopen
-    from urlparse import urlparse
+    from urllib2 import urlopen  # noqa
+    from urlparse import urlparse  # noqa
 
     def u(s):
         if not isinstance(s, text_type):

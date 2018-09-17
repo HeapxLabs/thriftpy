@@ -8,12 +8,20 @@
 """
 
 from __future__ import absolute_import
-
+try:
+    from gevent import monkey
+    monkey.patch_all()
+except Exception:
+    pass
 import functools
 import linecache
 import types
 
+from gevent import lock as lock_module
+
 from ._compat import with_metaclass
+
+lock = lock_module.BoundedSemaphore()
 
 
 def args2kwargs(thrift_spec, *args):
@@ -61,10 +69,10 @@ def init_func_generator(cls, spec):
     varnames, defaults = zip(*spec)
 
     args = ', '.join(map('{0[0]}={0[1]!r}'.format, spec))
-    init = "def __init__(self, {0}):\n".format(args)
+    init = "def __init__(self, {}):\n".format(args)
     init += "\n".join(map('    self.{0} = {0}'.format, varnames))
 
-    name = '<generated {0}.__init__>'.format(cls.__name__)
+    name = '<generated {}.__init__>'.format(cls.__name__)
     code = compile(init, name, 'exec')
     func = next(c for c in code.co_consts if isinstance(c, types.CodeType))
 
@@ -191,11 +199,13 @@ class TClient(object):
                           *args)
         kwargs.update(_kw)
         result_cls = getattr(self._service, _api + "_result")
-
-        self._send(_api, **kwargs)
+        with lock:
+            self._send(_api, **kwargs)
         # wait result only if non-oneway
         if not getattr(result_cls, "oneway"):
-            return self._recv(_api)
+            with lock:
+                _data = self._recv(_api)
+            return _data
 
     def _send(self, _api, **kwargs):
         self._oprot.write_message_begin(_api, TMessageType.CALL, self._seqid)
@@ -289,7 +299,7 @@ class TProcessor(object):
                 setattr(result, exc_name, e)
                 break
         else:
-            raise
+            raise TException
 
     def process(self, iprot, oprot):
         api, seqid, result, call = self.process_in(iprot)
@@ -317,7 +327,7 @@ class TMultiplexedProcessor(TProcessor):
         if service_name in self.processors:
             raise TApplicationException(
                 type=TApplicationException.INTERNAL_ERROR,
-                message='processor for `{0}` already registered'
+                message='processor for `{}` already registered'
                 .format(service_name))
         self.processors[service_name] = processor
 

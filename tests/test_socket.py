@@ -4,6 +4,7 @@ from __future__ import absolute_import, division
 
 import os
 import socket
+import sys
 
 import pytest
 
@@ -38,6 +39,8 @@ def test_inet_socket():
     _test_socket(server_socket, client_socket)
 
 
+@pytest.mark.skipif(os.getenv('TRAVIS', '') == 'true',
+                    reason='Travis CI dose not support IPv6')
 def test_inet6_socket():
     server_socket = TServerSocket(host="::1", port=12345,
                                   socket_family=socket.AF_INET6)
@@ -47,6 +50,9 @@ def test_inet6_socket():
     _test_socket(server_socket, client_socket)
 
 
+@pytest.mark.skipif(
+    sys.platform == 'darwin' and os.getuid() != 0,
+    reason='os.mknod() requires super-user privileges on darwin')
 def test_unix_domain_socket():
     sock_file = "/tmp/thriftpy_test.sock"
 
